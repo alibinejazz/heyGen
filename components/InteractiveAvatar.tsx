@@ -24,6 +24,7 @@ import { useMemoizedFn, usePrevious } from "ahooks";
 import InteractiveAvatarTextInput from "./InteractiveAvatarTextInput";
 
 import {AVATARS, STT_LANGUAGE_LIST} from "@/app/lib/constants";
+import useSendMessage from "./useSendMessage";
 
 export default function InteractiveAvatar() {
   const [isLoadingSession, setIsLoadingSession] = useState(false);
@@ -32,7 +33,7 @@ export default function InteractiveAvatar() {
   const [debug, setDebug] = useState<string>();
   const [knowledgeId, setKnowledgeId] = useState<string>("");
   const [avatarId, setAvatarId] = useState<string>("");
-  const [language, setLanguage] = useState<string>('en');
+  const [language, setLanguage] = useState<string>('ar-SA');
 
   const [data, setData] = useState<StartAvatarResponse>();
   const [text, setText] = useState<string>("");
@@ -40,6 +41,10 @@ export default function InteractiveAvatar() {
   const avatar = useRef<StreamingAvatar | null>(null);
   const [chatMode, setChatMode] = useState("text_mode");
   const [isUserTalking, setIsUserTalking] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const recognition = useRef<SpeechRecognition | null>(null);
+  const [resp, setResp] = useState();
+  const {sendMessage, response, loading, error} = useSendMessage();
 
   async function fetchAccessToken() {
     try {
@@ -112,6 +117,63 @@ export default function InteractiveAvatar() {
       setIsLoadingSession(false);
     }
   }
+
+  const toggleListening = () => {
+    if (!recognition.current) {
+      console.error("Speech recognition is not supported in this browser.");
+      return;
+    }
+  
+    if (isListening) {
+      recognition.current.stop(); // Stop listening when button is clicked again
+      console.log("Stopped listening");
+    } else {
+      recognition.current.start(); // Start listening
+      console.log("Started listening");
+    }
+  
+    setIsListening(!isListening); // Toggle the state
+  };
+  
+  useEffect(() => {
+    if (!("webkitSpeechRecognition" in window)) {
+      console.error("Speech recognition is not supported in this browser.");
+      return;
+    }
+  
+    recognition.current = new window.webkitSpeechRecognition();
+    recognition.current.continuous = true; // Keep listening until explicitly stopped
+    recognition.current.interimResults = false; // Only process final results
+    recognition.current.lang = language;
+  
+    recognition.current.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      console.log("Transcript:", transcript);
+      setText((prev) => `${prev} ${transcript}`);
+      sendMessage(transcript)
+      .then((res) => {
+        console.log("API Response Text:", res?.text);
+        setResp(res?.text)
+      })
+      .catch((err) => {
+        console.error("Error in sendMessage:", err);
+      });
+  };
+  
+    recognition.current.onerror = (event) => {
+      console.error("Speech recognition error:", event.error);
+    };
+  
+    // No longer stop on `onend`, as we want to manually control it
+    recognition.current.onend = () => {
+      console.log("Recognition session ended, but will restart if still listening.");
+      if (isListening) {
+        recognition.current?.start(); // Automatically restart if still listening
+      }
+      console.log(text)
+    };
+  }, [language, isListening]);
+  
   async function handleSpeak() {
     setIsLoadingRepeat(true);
     if (!avatar.current) {
@@ -120,7 +182,7 @@ export default function InteractiveAvatar() {
       return;
     }
     // speak({ text: text, task_type: TaskType.REPEAT })
-    await avatar.current.speak({ text: text, taskType: TaskType.REPEAT, taskMode: TaskMode.SYNC }).catch((e) => {
+    await avatar.current.speak({ text: resp, taskType: TaskType.REPEAT, taskMode: TaskMode.SYNC }).catch((e) => {
       setDebug(e.message);
     });
     setIsLoadingRepeat(false);
@@ -185,6 +247,14 @@ export default function InteractiveAvatar() {
         <CardBody className="h-[500px] flex flex-col justify-center items-center">
           {stream ? (
             <div className="h-[500px] w-[900px] justify-center items-center flex rounded-lg overflow-hidden">
+               <Button
+                onClick={toggleListening}
+                className={`bg-gradient-to-tr ${
+                  isListening ? "from-red-500 to-red-300" : "from-green-500 to-green-300"
+                } text-white rounded-lg`}
+              >
+                {isListening ? "Stop Listening" : "Start Listening"}
+              </Button> 
               <video
                 ref={mediaStream}
                 autoPlay
@@ -220,8 +290,7 @@ export default function InteractiveAvatar() {
             <div className="h-full justify-center items-center flex flex-col gap-8 w-[500px] self-center">
               <div className="flex flex-col gap-2 w-full">
                 <p className="text-sm font-medium leading-none">
-                  Custom Knowledge ID (optional)
-                </p>
+                              </p>
                 <Input
                   placeholder="Enter a custom knowledge ID"
                   value={knowledgeId}
@@ -289,7 +358,8 @@ export default function InteractiveAvatar() {
               handleChangeChatMode(v);
             }}
           >
-            <Tab key="text_mode" title="Text mode" />
+            
+            <Tab key="text_mode" title="Speak Anything" />
             <Tab key="voice_mode" title="Voice mode" />
           </Tabs>
           {chatMode === "text_mode" ? (
