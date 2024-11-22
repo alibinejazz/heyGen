@@ -2,7 +2,10 @@ import type { StartAvatarResponse } from "@heygen/streaming-avatar";
 
 import StreamingAvatar, {
   AvatarQuality,
-  StreamingEvents, TaskMode, TaskType, VoiceEmotion,
+  StreamingEvents,
+  TaskMode,
+  TaskType,
+  VoiceEmotion,
 } from "@heygen/streaming-avatar";
 import {
   Button,
@@ -21,9 +24,11 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useMemoizedFn, usePrevious } from "ahooks";
 
+import Image from "next/image";
+
 import InteractiveAvatarTextInput from "./InteractiveAvatarTextInput";
 
-import {AVATARS, STT_LANGUAGE_LIST} from "@/app/lib/constants";
+import { AVATARS, STT_LANGUAGE_LIST } from "@/app/lib/constants";
 import useSendMessage from "./useSendMessage";
 import micIcon from "../app/assets/mic.png";
 
@@ -34,7 +39,8 @@ export default function InteractiveAvatar() {
   const [debug, setDebug] = useState<string>();
   const [knowledgeId, setKnowledgeId] = useState<string>("");
   const [avatarId, setAvatarId] = useState<string>("");
-  const [language, setLanguage] = useState<string>('ar-SA');
+  // const [language, setLanguage] = useState<string>('ar-SA');
+  const [language, setLanguage] = useState<string>("en-US");
 
   const [data, setData] = useState<StartAvatarResponse>();
   const [text, setText] = useState<string>("");
@@ -45,7 +51,7 @@ export default function InteractiveAvatar() {
   const [isListening, setIsListening] = useState(false);
   const recognition = useRef<SpeechRecognition | null>(null);
   const [resp, setResp] = useState();
-  const {sendMessage, response, loading, error} = useSendMessage();
+  const { sendMessage, response, loading, error } = useSendMessage();
 
   async function fetchAccessToken() {
     try {
@@ -109,7 +115,7 @@ export default function InteractiveAvatar() {
       setData(res);
       // default to voice mode
       await avatar.current?.startVoiceChat({
-        useSilencePrompt: false
+        useSilencePrompt: false,
       });
       setChatMode("voice_mode");
     } catch (error) {
@@ -124,7 +130,66 @@ export default function InteractiveAvatar() {
       console.error("Speech recognition is not supported in this browser.");
       return;
     }
-  
+
+    if (isListening) {
+      recognition.current.stop(); // Stop listening when button is clicked again
+      console.log("Stopped listening");
+      handleSpeak();
+    } else {
+      recognition.current.start(); // Start listening
+      console.log("Started listening");
+    }
+
+    setIsListening(!isListening); // Toggle the state
+  };
+
+  useEffect(() => {
+    if (!("webkitSpeechRecognition" in window)) {
+      console.error("Speech recognition is not supported in this browser.");
+      return;
+    }
+
+    recognition.current = new window.webkitSpeechRecognition();
+    recognition.current.continuous = true; // Keep listening until explicitly stopped
+    recognition.current.interimResults = false; // Only process final results
+    recognition.current.lang = language;
+
+    recognition.current.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      console.log("Transcript:", transcript);
+      setText((prev) => `${prev} ${transcript}`);
+      sendMessage(transcript)
+        .then((res) => {
+          console.log("API Response Text:", res?.text);
+          setResp(res?.text);
+        })
+        .catch((err) => {
+          console.error("Error in sendMessage:", err);
+        });
+    };
+
+    recognition.current.onerror = (event) => {
+      console.error("Speech recognition error:", event.error);
+    };
+
+    // No longer stop on `onend`, as we want to manually control it
+    recognition.current.onend = () => {
+      console.log(
+        "Recognition session ended, but will restart if still listening."
+      );
+      if (isListening) {
+        recognition.current?.start(); // Automatically restart if still listening
+      }
+      console.log(text);
+    };
+  }, [language, isListening]);
+
+  async function handleSpeak() {
+    if (!recognition.current) {
+      console.error("Speech recognition is not supported in this browser.");
+      return;
+    }
+
     if (isListening) {
       recognition.current.stop(); // Stop listening when button is clicked again
       console.log("Stopped listening");
@@ -132,50 +197,9 @@ export default function InteractiveAvatar() {
       recognition.current.start(); // Start listening
       console.log("Started listening");
     }
-  
+
     setIsListening(!isListening); // Toggle the state
-  };
-  
-  useEffect(() => {
-    if (!("webkitSpeechRecognition" in window)) {
-      console.error("Speech recognition is not supported in this browser.");
-      return;
-    }
-  
-    recognition.current = new window.webkitSpeechRecognition();
-    recognition.current.continuous = true; // Keep listening until explicitly stopped
-    recognition.current.interimResults = false; // Only process final results
-    recognition.current.lang = language;
-  
-    recognition.current.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      console.log("Transcript:", transcript);
-      setText((prev) => `${prev} ${transcript}`);
-      sendMessage(transcript)
-      .then((res) => {
-        console.log("API Response Text:", res?.text);
-        setResp(res?.text)
-      })
-      .catch((err) => {
-        console.error("Error in sendMessage:", err);
-      });
-  };
-  
-    recognition.current.onerror = (event) => {
-      console.error("Speech recognition error:", event.error);
-    };
-  
-    // No longer stop on `onend`, as we want to manually control it
-    recognition.current.onend = () => {
-      console.log("Recognition session ended, but will restart if still listening.");
-      if (isListening) {
-        recognition.current?.start(); // Automatically restart if still listening
-      }
-      console.log(text)
-    };
-  }, [language, isListening]);
-  
-  async function handleSpeak() {
+    // ----------------------------------
     setIsLoadingRepeat(true);
     if (!avatar.current) {
       setDebug("Avatar API not initialized");
@@ -183,9 +207,11 @@ export default function InteractiveAvatar() {
       return;
     }
     // speak({ text: text, task_type: TaskType.REPEAT })
-    await avatar.current.speak({ text: resp, taskType: TaskType.REPEAT, taskMode: TaskMode.SYNC }).catch((e) => {
-      setDebug(e.message);
-    });
+    await avatar.current
+      .speak({ text: resp, taskType: TaskType.REPEAT, taskMode: TaskMode.SYNC })
+      .catch((e) => {
+        setDebug(e.message);
+      });
     setIsLoadingRepeat(false);
   }
   async function handleInterrupt() {
@@ -194,11 +220,9 @@ export default function InteractiveAvatar() {
 
       return;
     }
-    await avatar.current
-      .interrupt()
-      .catch((e) => {
-        setDebug(e.message);
-      });
+    await avatar.current.interrupt().catch((e) => {
+      setDebug(e.message);
+    });
   }
   async function endSession() {
     await avatar.current?.stopAvatar();
@@ -245,21 +269,28 @@ export default function InteractiveAvatar() {
   return (
     <div className="w-full flex flex-col gap-4">
       <Card>
-        <CardBody className="h-[100vh] w-[100%] flex flex-col justify-center items-center">
+        <CardBody className="h-[80vh] w-[100%] flex flex-col justify-center items-center">
           {stream ? (
-            <div className="h-[100vh] w-[100%] justify-center items-center flex flex-col rounded-lg overflow-hidden">
-              <div>
-                <img src={micIcon} alt="mic-icon"/>
-              </div>
-               <Button
+            <div className="h-[90vh] w-[100%] justify-center items-center flex flex-col-reverse rounded-lg overflow-hidden">
+                
+              {/* <Image
+                src={micIcon}
+                alt="mic-icon"
+                width={150} // Adjust size as per requirement
+                // height={40}
+                onClick={toggleListening}
+              /> */}
+              {/* <Button
                 onClick={toggleListening}
                 className={`bg-gradient-to-tr ${
-                  isListening ? "from-red-500 to-red-300" : "from-green-500 to-green-300"
+                  isListening
+                    ? "from-red-500 to-red-300"
+                    : "from-green-500 to-green-300"
                 } text-white rounded-lg`}
               >
                 {isListening ? "Stop Listening" : "Start Listening"}
-              </Button> 
-              
+              </Button> */}
+
               <video
                 ref={mediaStream}
                 autoPlay
@@ -294,8 +325,7 @@ export default function InteractiveAvatar() {
           ) : !isLoadingSession ? (
             <div className="h-full justify-center items-center flex flex-col gap-8 w-[500px] self-center">
               <div className="flex flex-col gap-2 w-full">
-                <p className="text-sm font-medium leading-none">
-                              </p>
+                <p className="text-sm font-medium leading-none"></p>
                 <Input
                   placeholder="Enter a custom knowledge ID"
                   value={knowledgeId}
@@ -335,9 +365,7 @@ export default function InteractiveAvatar() {
                   }}
                 >
                   {STT_LANGUAGE_LIST.map((lang) => (
-                    <SelectItem key={lang.key}>
-                      {lang.label}
-                    </SelectItem>
+                    <SelectItem key={lang.key}>{lang.label}</SelectItem>
                   ))}
                 </Select>
               </div>
@@ -355,21 +383,29 @@ export default function InteractiveAvatar() {
           )}
         </CardBody>
         <Divider />
-        <CardFooter className="flex flex-col gap-3 relative hidden">
-          <Tabs
+        <CardFooter className="flex flex-col gap-3 relative">
+          {/* <Tabs
             aria-label="Options"
             selectedKey={chatMode}
             onSelectionChange={(v) => {
               handleChangeChatMode(v);
             }}
           >
-            
             <Tab key="text_mode" title="Speak Anything" />
             <Tab key="voice_mode" title="Voice mode" />
-          </Tabs>
+          </Tabs> */}
           {chatMode === "text_mode" ? (
-            <div className="w-full flex relative hidden">
-              <InteractiveAvatarTextInput
+            <div>
+              <Image
+              className={`w-full flex justify-evenly items-center relative ${isListening ? "bg-blue-200 bg-opacity-60" : ""}`}
+                // eslint-disable-next-line prettier/prettier
+                src={micIcon}
+                alt="mic-icon"
+                width={150} // Adjust size as per requirement
+                // height={40}
+                onClick={toggleListening}
+              />
+              {/* <InteractiveAvatarTextInput
                 disabled={!stream}
                 input={text}
                 label="Chat"
@@ -377,10 +413,10 @@ export default function InteractiveAvatar() {
                 placeholder="Type something for the avatar to respond"
                 setInput={setText}
                 onSubmit={handleSpeak}
-              />
-              {text && (
+              /> */}
+              {/* {text && (
                 <Chip className="absolute right-16 top-3">Listening</Chip>
-              )}
+              )} */}
             </div>
           ) : (
             <div className="w-full text-center hidden">
