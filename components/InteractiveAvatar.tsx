@@ -25,6 +25,7 @@ import InteractiveAvatarTextInput from "./InteractiveAvatarTextInput";
 
 import {AVATARS, STT_LANGUAGE_LIST} from "@/app/lib/constants";
 import useSendMessage from "./useSendMessage";
+import micIcon from "../app/assets/mic.png";
 
 export default function InteractiveAvatar() {
   const [isLoadingSession, setIsLoadingSession] = useState(false);
@@ -244,9 +245,12 @@ export default function InteractiveAvatar() {
   return (
     <div className="w-full flex flex-col gap-4">
       <Card>
-        <CardBody className="h-[500px] flex flex-col justify-center items-center">
+        <CardBody className="h-[100vh] w-[100%] flex flex-col justify-center items-center">
           {stream ? (
-            <div className="h-[500px] w-[900px] justify-center items-center flex rounded-lg overflow-hidden">
+            <div className="h-[100vh] w-[100%] justify-center items-center flex flex-col rounded-lg overflow-hidden">
+              <div>
+                <img src={micIcon} alt="mic-icon"/>
+              </div>
                <Button
                 onClick={toggleListening}
                 className={`bg-gradient-to-tr ${
@@ -255,6 +259,7 @@ export default function InteractiveAvatar() {
               >
                 {isListening ? "Stop Listening" : "Start Listening"}
               </Button> 
+              
               <video
                 ref={mediaStream}
                 autoPlay
@@ -267,7 +272,7 @@ export default function InteractiveAvatar() {
               >
                 <track kind="captions" />
               </video>
-              <div className="flex flex-col gap-2 absolute bottom-3 right-3">
+              <div className="flex flex-col gap-2 absolute bottom-3 right-3 hidden">
                 <Button
                   className="bg-gradient-to-tr from-indigo-500 to-indigo-300 text-white rounded-lg"
                   size="md"
@@ -350,7 +355,7 @@ export default function InteractiveAvatar() {
           )}
         </CardBody>
         <Divider />
-        <CardFooter className="flex flex-col gap-3 relative">
+        <CardFooter className="flex flex-col gap-3 relative hidden">
           <Tabs
             aria-label="Options"
             selectedKey={chatMode}
@@ -363,7 +368,7 @@ export default function InteractiveAvatar() {
             <Tab key="voice_mode" title="Voice mode" />
           </Tabs>
           {chatMode === "text_mode" ? (
-            <div className="w-full flex relative">
+            <div className="w-full flex relative hidden">
               <InteractiveAvatarTextInput
                 disabled={!stream}
                 input={text}
@@ -378,7 +383,7 @@ export default function InteractiveAvatar() {
               )}
             </div>
           ) : (
-            <div className="w-full text-center">
+            <div className="w-full text-center hidden">
               <Button
                 isDisabled={!isUserTalking}
                 className="bg-gradient-to-tr from-indigo-500 to-indigo-300 text-white"
@@ -391,7 +396,7 @@ export default function InteractiveAvatar() {
           )}
         </CardFooter>
       </Card>
-      <p className="font-mono text-right">
+      <p className="font-mono text-right hidden">
         <span className="font-bold">Console:</span>
         <br />
         {debug}
