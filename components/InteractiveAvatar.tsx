@@ -102,7 +102,7 @@ export default function InteractiveAvatar() {
     try {
       const res = await avatar.current.createStartAvatar({
         quality: AvatarQuality.Low,
-        avatarName: avatarId,
+        avatarName: 'Tyler-incasualsuit-20220721',
         knowledgeId: knowledgeId, // Or use a custom `knowledgeBase`.
         voice: {
           rate: 1.5, // 0.5 ~ 1.5
@@ -266,6 +266,10 @@ export default function InteractiveAvatar() {
     }
   }, [mediaStream, stream]);
 
+  useEffect(() => {
+    startSession();
+}, []);
+
   return (
     <div className="w-full flex flex-col gap-4">
       <Card>
@@ -324,7 +328,7 @@ export default function InteractiveAvatar() {
             </div>
           ) : !isLoadingSession ? (
             <div className="h-full justify-center items-center flex flex-col gap-8 w-[500px] self-center">
-              <div className="flex flex-col gap-2 w-full">
+              {/* <div className="flex flex-col gap-2 w-full">
                 <p className="text-sm font-medium leading-none"></p>
                 <Input
                   placeholder="Enter a custom knowledge ID"
@@ -336,7 +340,7 @@ export default function InteractiveAvatar() {
                 </p>
                 <Input
                   placeholder="Enter a custom avatar ID"
-                  value={avatarId}
+                  value='Tyler-incasualsuit-20220721'
                   onChange={(e) => setAvatarId(e.target.value)}
                 />
                 <Select
@@ -351,7 +355,7 @@ export default function InteractiveAvatar() {
                       key={avatar.avatar_id}
                       textValue={avatar.avatar_id}
                     >
-                      {avatar.name}
+                      {"Tyler in Casual Suit"}
                     </SelectItem>
                   ))}
                 </Select>
@@ -376,7 +380,7 @@ export default function InteractiveAvatar() {
                 onClick={startSession}
               >
                 Start session
-              </Button>
+              </Button> */}
             </div>
           ) : (
             <Spinner color="default" size="lg" />
